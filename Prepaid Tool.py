@@ -79,12 +79,17 @@ def process_workpaper(basefile, client_name, fy_start, fy_end,
     ws["C3"]  = f"{fy_start} to {fy_end}"
     ws["Q38"] = fy_start_date
     ws["R38"] = fy_end_date
+    ws["Q38"].number_format = "d-mmm-yy"
+    ws["R38"].number_format = "d-mmm-yy"
+    
     ws2["C2"] = client_name
     ws2["C3"] = f"{fy_start} to {fy_end}"
     
     # Previous FY date and Current FY date for Leads sheet
     ws2["C20"] = fy_end_date 
     ws2["D20"] = fy_end_date - relativedelta(years=1)
+    ws2["C20"].number_format = "d-mmm-yy"
+    ws2["D20"].number_format = "d-mmm-yy"
     
     def update_dynamic_dates(value):
         if value is None:
@@ -154,6 +159,20 @@ def process_workpaper(basefile, client_name, fy_start, fy_end,
             else:
                 value = row.get(col_name)
 
+            if "date" in str(col_name).lower() and pd.notna(value):
+                if isinstance(value, (int, float)):
+                    try:
+                        value = pd.to_datetime(value, origin="1899-12-30", unit="D")
+                    except Exception:
+                        pass
+                elif isinstance(value, str):
+                    try:
+                        value = pd.to_datetime(value)
+                    except Exception:
+                        pass
+                if pd.isna(value):
+                    value = None
+
             value = update_dynamic_dates(value)
             template_df.at[i, col_name] = value
             write_ops.append((excel_row, col_idx, value))
@@ -161,7 +180,10 @@ def process_workpaper(basefile, client_name, fy_start, fy_end,
     # ── Write data ──
     progress(0.50, "Writing data to Excel...")
     for r, c, v in write_ops:
-        ws.cell(row=r, column=c, value=v)
+        cell = ws.cell(row=r, column=c, value=v)
+        if isinstance(v, (datetime, pd.Timestamp)):
+            cell.number_format = "d-mmm-yy"
+
 
     # ── Determine the last real data row dynamically from the
     #    Service Start / End Date columns (TOTAL goes immediately after it) ──
